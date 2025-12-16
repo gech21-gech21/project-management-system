@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//
+// ENUMS
+//
+enum Role {
+  ADMIN
+  TEAM_LEADER
+  USER
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+//
+// USER MODEL
+//
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+
+  // User belongs to one team as a member
+  teamId        Int?
+  teamMembership Team? @relation("TeamMembers", fields: [teamId], references: [id])
+
+  // User can lead many teams
+  teamLeadership Team[] @relation("TeamLeaders")
+
+  // Relations
+  projects        Project[]    @relation("ProjectMembers")
+  assignedTasks   Task[]       @relation("TaskAssignee")
+  notifications   Notification[]
+  performance     Performance[]
+  comments        Comment[]
+  attachments     Attachment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//
+// TEAM MODEL
+//
+model Team {
+  id       Int     @id @default(autoincrement())
+  name     String
+
+  // Leader
+  leaderId Int
+  leader   User @relation("TeamLeaders", fields: [leaderId], references: [id])
+
+  // Members
+  members  User[] @relation("TeamMembers")
+
+  // Projects handled by the team
+  projects Project[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//
+// PROJECT MODEL
+//
+model Project {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+  status      ProjectStatus @default(ACTIVE)
+
+  // Assigned team
+  teamId Int?
+  team   Team? @relation(fields: [teamId], references: [id])
+
+  // Members from User model
+  teamMembers User[]   @relation("ProjectMembers")
+
+  // Relations
+  tasks        Task[]
+  attachments  Attachment[]
+  comments     Comment[]
+  history      TaskHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//
+// TASK MODEL
+//
+model Task {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+
+  projectId Int
+  project   Project @relation(fields: [projectId], references: [id])
+
+  assigneeId Int?
+  assignee   User? @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
+  comments    Comment[]
+  attachments Attachment[]
+  history     TaskHistory[]
+
+  dueDate   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//
+// COMMENT MODEL
+//
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+
+  taskId    Int?
+  task      Task? @relation(fields: [taskId], references: [id])
+
+  projectId Int?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+//
+// ATTACHMENT MODEL
+//
+model Attachment {
+  id        Int      @id @default(autoincrement())
+  url       String
+  fileType  String
+
+  taskId    Int?
+  task      Task? @relation(fields: [taskId], references: [id])
+
+  projectId Int?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  uploadedById Int
+  uploadedBy   User @relation(fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+//
+// NOTIFICATION MODEL
+//
+model Notification {
+  id      Int     @id @default(autoincrement())
+  message String
+  isRead  Boolean @default(false)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+//
+// PERFORMANCE MODEL
+//
+model Performance {
+  id            Int     @id @default(autoincrement())
+  userId        Int
+  user          User @relation(fields: [userId], references: [id])
+
+  taskCompleted Int   @default(0)
+  hoursWorked   Int   @default(0)
+  rating        Float @default(0.0)
+
+  createdAt     DateTime @default(now())
+}
+
+//
+// TASK HISTORY MODEL
+//
+model TaskHistory {
+  id        Int      @id @default(autoincrement())
+  taskId    Int
+  task      Task @relation(fields: [taskId], references: [id])
+
+  projectId Int
+  project   Project @relation(fields: [projectId], references: [id])
+
+  change    String
+  changedAt DateTime @default(now())
+}
